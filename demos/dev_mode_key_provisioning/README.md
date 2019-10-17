@@ -6,7 +6,16 @@ The purpose of the Amazon FreeRTOS developer-mode key provisioning demo is to pr
 For lab testing purposes, if your device allows the import of private keys, you can follow the instructions in [Configuring the Amazon FreeRTOS Demos](https://docs.aws.amazon.com/freertos/latest/userguide/freertos-configure.html). 
 
 ## Option #2: Onboard Private Key Generation ##
-If your device does not allow the import of private keys, or if your solution calls for the use of [Just-in-Time Provisioning](https://docs.aws.amazon.com/iot/latest/developerguide/jit-provisioning.html) (JITP), you can follow the instructions below.
+If your device does not allow the import of private keys, or if your solution calls for the use of [Just-in-Time Provisioning](https://docs.aws.amazon.com/iot/latest/developerguide/jit-provisioning.html) (JITP), you can follow the instructions below. In summary, the sequence of operations is:
+
+1. Public Key Infrastructure Setup
+1. Create a certificate authority (CA) certificate
+1. Register your CA certificate with AWS IoT
+1. Create a Device Certificate, issued by your registered CA
+1. Import the CA certificate and device certificate into your Amazon FreeRTOS device
+1. Update the AWS IoT Registry in order to mark your certificate as Active
+1. Create an AWS IoT Thing, attach a policy to the Thing, and attach a device certificate to the Thing 
+1. Run the Amazon FreeRTOS "Hello World" demo on your device
 
 ### Initial Configuration ###
 First, perform the steps in [Configuring the Amazon FreeRTOS Demos](https://docs.aws.amazon.com/freertos/latest/userguide/freertos-configure.html), but skip the last step (that is, don't do *To format your AWS IoT credentials*). The net result should be that the *demos/include/aws_clientcredential.h* file has been updated with your settings, but the *demos/include/aws_clientcredential_keys.h* file has not. 
@@ -18,7 +27,7 @@ Open the Hello World MQTT demo as described in the [Getting Started guide](https
 #define keyprovisioningFORCE_GENERATE_NEW_KEY_PAIR 1
 ```
 
-Then build and run the demo project and continue to the next section.
+Double-check that your device network connection is working (i.e. the [Configuring](https://docs.aws.amazon.com/freertos/latest/userguide/freertos-configure.html) link, above). Then build and run the demo project and continue to the next section. 
 
 ### Public Key Extraction ###
 Since the device has not yet been provisioned with a private key and client certificate, the demo will fail to authenticate to AWS IoT. However, the Hello World MQTT demo starts by running developer-mode key provisioning, resulting in the creation of a private key if one was not already present. You should see something like the following near the beginning of the serial console output:
