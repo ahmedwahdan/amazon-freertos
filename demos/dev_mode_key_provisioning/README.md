@@ -61,25 +61,27 @@ Don't forget to disable the temporary key generation setting you enabled above. 
 ```
 
 ### Public Key Infrastructure Setup ###
-You can now use a variation of the instructions in [Use Your Own Certificate](https://docs.aws.amazon.com/iot/latest/developerguide/device-certs-your-own.html) to create an X.509 certificate hierarchy for your device lab certificate. Stop before executing the sequence described in the section Creating a Device Certificate Using Your CA Certificate. Also, since the device will not be signing the certificate request, a separate "issuance officer" key and certificate must be created for that purpose:
+Follow the instructions in [Registering Your CA Certificate](https://docs.aws.amazon.com/iot/latest/developerguide/device-certs-your-own.html#register-CA-cert) to create a certificate hierarchy for your device lab certificate. Stop before executing the sequence described in the section Creating a Device Certificate Using Your CA Certificate. 
+
+In this case, the device will not be signing the certificate request (i.e. Certificate Service Request, or CSR). That's because the X.509 encoding logic required for creating and signing a CSR has been excluded from the Amazon FreeRTOS demo projects in the interest of reducing ROM size. Instead, for lab testing purposes, create a private key on your workstation for the purpose of signing the CSR. 
 
 ```
-openssl genrsa -out issuanceOfficer.key 2048
-openssl req -new -key issuanceOfficer.key -out deviceCert.csr
+openssl genrsa -out tempCsrSigner.key 2048
+openssl req -new -key tempCsrSigner.key -out deviceCert.csr
 ```
 
-Once your Certificate Authority has been created and registered with AWS IoT, use the following command to issue a client certificate based on the device CSR that was signed by the issuance officer:
+Once your Certificate Authority has been created and registered with AWS IoT, use the following command to issue a client certificate based on the device CSR that was signed in the previous step:
 
 ```
 openssl x509 -req -in deviceCert.csr -CA rootCA.pem -CAkey rootCA.key -CAcreateserial -out deviceCert.pem -days 500 -sha256 -force_pubkey DevicePublicKey.pem
 ```
 
-### Certificate Import ###
-With the certificate issued, the next step is to import it into your device. You will also need to import your Certificate Authority (CA) certificate, since it is required in order for first-time authentication to AWS IoT to succeed when using JITP. In the *aws_clientcredential_keys.h* file in your project, set the `keyCLIENT_CERTIFICATE_PEM` macro to be the contents of *deviceCert.pem* and set the `keyJITR_DEVICE_CERTIFICATE_AUTHORITY_PEM` macro to be the contents of *rootCA.pem*. 
+Even though the CSR was signed with a temporary private key, the issued certificate will only be usable in tandem with the real device private key. The same mechanism can be used in production; however, in that case, store the CSR signer key in separate hardware, and configure your certificate authority to only issue certificates for requests that have been signed by that specific key (e.g. which should remain in the possession of a designated administrator).
 
-Recompile your project after the header change described above. Then re-run the MQTT Hello World demo in order to connect to AWS IoT with your new certificate and private key. Please note that the authentication attempt will again fail - see the next section.
+### Certificate Import ###
+With the certificate issued, the next step is to import it into your device. You will also need to import your Certificate Authority (CA) certificate, since it is required in order to ensure that the latest certificate chain is read from device storage and transmitted to AWS IoT during TLS negotiation. In the *aws_clientcredential_keys.h* file in your project, set the `keyCLIENT_CERTIFICATE_PEM` macro to be the contents of *deviceCert.pem* and set the `keyJITR_DEVICE_CERTIFICATE_AUTHORITY_PEM` macro to be the contents of *rootCA.pem*. 
 
 ### Device Authorization ###
-The *Enable Automatic Registration* section of [Use Your Own Certificate](https://docs.aws.amazon.com/iot/latest/developerguide/device-certs-your-own.html) describes how to create a Lambda that will automatically mark your new device certificate as ACTIVE in the AWS IoT registry. If you are not using a Lambda, you must create a new Thing, attach the PENDING certificate and a policy to your Thing, and then mark the certificate as ACTIVE. All of those steps can be performed manually in the AWS IoT console. 
+Import deviceCert.pem into the AWS IoT registry as described in [Use Your Own Certificate](https://docs.aws.amazon.com/iot/latest/developerguide/device-certs-your-own.html). You must create a new Thing, attach the PENDING certificate and a policy to your Thing, and then mark the certificate as ACTIVE. All of those steps can be performed manually in the AWS IoT console. 
 
 Once the new client certificate is ACTIVE and associated with a Thing and policy, run the MQTT Hello World demo again. This time, the connection to the AWS IoT MQTT broker will succeed.
